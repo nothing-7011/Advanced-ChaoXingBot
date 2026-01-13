@@ -8,7 +8,12 @@ import time
 import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
-from queue import PriorityQueue, ShutDown
+from queue import PriorityQueue
+try:
+    from queue import ShutDown
+except ImportError:
+    class ShutDown(Exception):
+        pass
 from threading import RLock
 from typing import Any
 
@@ -100,6 +105,7 @@ def load_config_from_file(config_path):
     common_config: dict[str, Any] = {}
     tiku_config: dict[str, Any] = {}
     notification_config: dict[str, Any] = {}
+    parser_config: dict[str, Any] = {}
     
     # 检查并读取common节
     if config.has_section("common"):
@@ -133,8 +139,11 @@ def load_config_from_file(config_path):
     # 检查并读取notification节
     if config.has_section("notification"):
         notification_config = dict(config.items("notification"))
+
+    if config.has_section("parser"):
+        parser_config = dict(config.items("parser"))
     
-    return common_config, tiku_config, notification_config
+    return common_config, tiku_config, notification_config, parser_config
 
 
 def build_config_from_args(args):
@@ -148,7 +157,7 @@ def build_config_from_args(args):
         "jobs": args.jobs,
         "notopen_action": args.notopen_action if args.notopen_action else "retry"
     }
-    return common_config, {}, {}
+    return common_config, {}, {}, {}
 
 
 def init_config():
@@ -292,7 +301,11 @@ class JobProcessor:
 
         self.task_queue.join()
         time.sleep(0.5)
-        self.task_queue.shutdown()
+        if hasattr(self.task_queue, 'shutdown'):
+            self.task_queue.shutdown()
+        else:
+            for _ in range(self.worker_num):
+                self.task_queue.put(None)
 
 
     @log_error
@@ -301,6 +314,8 @@ class JobProcessor:
         while True:
             try:
                 task = self.task_queue.get()
+                if task is None:
+                    return
             except ShutDown:
                 logger.info("Queue shut down")
                 return
@@ -418,6 +433,10 @@ def process_course(chaoxing: Chaoxing, course:dict[str, Any], config: dict):
     p = JobProcessor(chaoxing, course, tasks, config)
     p.run()
 
+    # 如果是AI大模型答题模式，标记该课程收集完成
+    if chaoxing.tiku and chaoxing.tiku.name == 'AI大模型答题':
+        from api.collector import QuestionCollector
+        QuestionCollector().mark_finished(course["courseId"])
 
     tqdm.format_sizeof = _old_format_sizeof
 
@@ -486,7 +505,7 @@ def main():
     """主程序入口"""
     try:
         # 初始化配置
-        common_config, tiku_config, notification_config = init_config()
+        common_config, tiku_config, notification_config, parser_config = init_config()
         
         # 强制播放按照配置文件调节
         common_config["speed"] = min(2.0, max(1.0, common_config.get("speed", 1.0)))
@@ -516,6 +535,17 @@ def main():
         logger.info(f"课程列表过滤完毕, 当前课程任务数量: {len(course_task)}")
         for course in course_task:
             process_course(chaoxing, course, common_config)
+
+        # 检查是否需要运行Parser Agent
+        if tiku_config.get("provider") == "AI" and parser_config.get("gemini_api_key"):
+            logger.info("检测到AI答题模式，开始运行Parser Agent进行图片解析...")
+            from agents.parser_agent import ImageParserAgent
+            agent = ImageParserAgent(
+                api_key=parser_config["gemini_api_key"],
+                model_name=parser_config.get("model", "gemini-2.0-flash")
+            )
+            for course in course_task:
+                agent.parse_images(course["courseId"])
         
         logger.info("所有课程学习任务已完成")
         notification.send("chaoxing : 所有课程学习任务已完成")

@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from api.answer import *
 from api.answer_check import cut
+from api.collector import QuestionCollector
 from api.cipher import AESCipher
 from api.config import GlobalConst as gc
 from api.cookies import save_cookies, use_cookies
@@ -759,6 +760,11 @@ class Chaoxing:
         except Exception as e:
             logger.error(f"请求失败: {e}")
             return StudyResult.ERROR
+
+        if self.tiku.name == 'AI大模型答题':
+            logger.info("当前为大模型答题模式，正在收集题目信息...")
+            QuestionCollector().add_questions(_course['courseId'], questions.get("questions", []))
+            return StudyResult.SUCCESS
 
         _ORIGIN_HTML_CONTENT = final_resp.text  # 用于配合输出网页源码, 帮助修复#391错误
 
