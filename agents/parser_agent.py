@@ -1,0 +1,154 @@
+import json
+import os
+import re
+import time
+import requests
+from io import BytesIO
+from typing import List, Dict, Any
+
+from google import genai
+from PIL import Image
+
+from api.logger import logger
+from api.collector import QuestionCollector
+
+class ImageParserAgent:
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash"):
+        self.api_key = api_key
+        self.model_name = model_name
+        self.client = None
+        if self.api_key:
+            try:
+                self.client = genai.Client(api_key=self.api_key)
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini client: {e}")
+
+    def _download_image(self, url: str) -> Image.Image:
+        try:
+            # Simple retry mechanism
+            for _ in range(3):
+                try:
+                    resp = requests.get(url, timeout=15)
+                    if resp.status_code == 200:
+                        return Image.open(BytesIO(resp.content))
+                except requests.RequestException:
+                    time.sleep(1)
+            return None
+        except Exception as e:
+            logger.error(f"Failed to download image {url}: {e}")
+        return None
+
+    def _process_text_with_images(self, text: str) -> str:
+        if not text:
+            return text
+
+        # Regex to find img tags: <img ... src="url" ...>
+        # Handles single/double quotes, and src attribute position
+        img_pattern = re.compile(r'<img[^>]+src=["\']([^"\']+)["\'][^>]*>', re.IGNORECASE)
+
+        matches = list(img_pattern.finditer(text))
+        if not matches:
+            return text
+
+        urls = []
+        for m in matches:
+            urls.append(m.group(1))
+
+        processed_map = {}
+
+        for url in urls:
+            if url in processed_map:
+                continue
+
+            # Check if URL is valid
+            if not url.startswith('http'):
+                if url.startswith('//'):
+                    url = 'https:' + url
+                else:
+                    logger.warning(f"Skipping potentially relative URL: {url}")
+                    continue
+
+            logger.info(f"Processing image: {url}")
+            image = self._download_image(url)
+            if not image:
+                logger.error(f"Failed to download: {url}")
+                processed_map[url] = "[图片下载失败]"
+                continue
+
+            try:
+                prompt = "Identify the content of this image. If it contains mathematical formulas, convert them to LaTeX format. Return only the plain text result."
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=[image, prompt]
+                )
+                description = response.text.strip() if response.text else ""
+                processed_map[url] = f" [{description}] "
+            except Exception as e:
+                logger.error(f"Gemini processing failed for {url}: {e}")
+                processed_map[url] = "[图片解析失败]"
+
+            time.sleep(1)
+
+        def replace_callback(match):
+            url = match.group(1)
+            if url.startswith('//'):
+                 lookup_url = 'https:' + url
+            else:
+                 lookup_url = url
+            return processed_map.get(lookup_url, match.group(0))
+
+        new_text = img_pattern.sub(replace_callback, text)
+        return new_text
+
+    def parse_images(self, course_id: str):
+        if not self.client:
+            logger.error("Parser Agent not initialized (missing API key).")
+            return
+
+        collector = QuestionCollector()
+        file_path = collector._get_file_path(course_id)
+
+        if not os.path.exists(file_path):
+            logger.warning(f"No questions file found for course {course_id}")
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load questions JSON: {e}")
+            return
+
+        if not data.get("finished", False):
+            logger.warning(f"Course {course_id} collection not marked as finished. Skipping parsing.")
+            return
+
+        logger.info(f"Starting image parsing for course {course_id}...")
+
+        questions = data.get("questions", [])
+        updated_count = 0
+
+        for q in questions:
+            # Process title
+            if 'title' in q:
+                original = q['title']
+                q['title'] = self._process_text_with_images(q['title'])
+                if original != q['title']:
+                    updated_count += 1
+
+            # Process options
+            if 'options' in q and isinstance(q['options'], str):
+                original = q['options']
+                q['options'] = self._process_text_with_images(q['options'])
+                if original != q['options']:
+                    updated_count += 1
+
+        if updated_count > 0:
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                logger.info(f"Updated {updated_count} questions with parsed images for course {course_id}.")
+            except Exception as e:
+                logger.error(f"Failed to save parsed questions: {e}")
+        else:
+            logger.info(f"No images found or parsed for course {course_id}.")
