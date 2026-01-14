@@ -547,7 +547,8 @@ def main():
             agent = ImageParserAgent(
                 api_key=parser_config["gemini_api_key"],
                 model_name=parser_config.get("model", "gemini-2.0-flash"),
-                temperature=float(parser_config.get("temperature", 0.7))
+                temperature=float(parser_config.get("temperature", 0.7)),
+                endpoint=parser_config.get("endpoint")
             )
             for course in course_task:
                 agent.parse_images(course["courseId"])

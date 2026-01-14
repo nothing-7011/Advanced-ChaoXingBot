@@ -13,7 +13,6 @@ from typing import Optional
 
 import httpx
 import requests
-from openai import OpenAI
 from urllib3 import disable_warnings, exceptions
 
 from api.answer_check import *
@@ -205,7 +204,7 @@ class Tiku:
             self.DISABLE = True
             return None
         
-    def query(self,q_info:dict) -> Optional[str]:
+    def query(self,q_info:dict, **kwargs) -> Optional[str]:
         if self.DISABLE:
             return None
 
@@ -222,7 +221,7 @@ class Tiku:
             logger.info(f"从缓存中获取答案：{q_info['title']} -> {answer}")
             return answer.strip()
         else:
-            answer = self._query(q_info)
+            answer = self._query(q_info, **kwargs)
             if answer:
                 answer = answer.strip()
                 logger.info(f"从{self.name}获取答案：{q_info['title']} -> {answer}")
@@ -238,7 +237,7 @@ class Tiku:
 
 
 
-    def _query(self, q_info:dict) -> Optional[str]:
+    def _query(self, q_info:dict, **kwargs) -> Optional[str]:
         """
         查询接口, 交由自定义题库实现
         """
@@ -307,7 +306,7 @@ class TikuYanxi(Tiku):
         self._token_index = 0   # token队列计数器
         self._times = 100   # 查询次数剩余, 初始化为100, 查询后校对修正
 
-    def _query(self,q_info:dict):
+    def _query(self,q_info:dict, **kwargs):
         res = requests.get(
             self.api,
             params={
@@ -368,7 +367,7 @@ class TikuLike(Tiku):
         self._count = 0
         self._headers = {"Content-Type": "application/json"}
 
-    def _query(self, q_info:dict = None):
+    def _query(self, q_info:dict = None, **kwargs):
         if not q_info:
             logger.error("当前无题目信息，请检查")
             return ""
@@ -673,7 +672,7 @@ class TikuAdapter(Tiku):
         self.name = 'TikuAdapter题库'
         self.api = ''
 
-    def _query(self, q_info: dict):
+    def _query(self, q_info: dict, **kwargs):
         # 判断题目类型
         if q_info['type'] == "single":
             type = 0
@@ -715,122 +714,48 @@ class TikuAdapter(Tiku):
         self.api = self._conf['url']
 
 class AI(Tiku):
-    # AI大模型答题实现
+    # AI大模型答题实现 (Replaced with Agent based implementation)
     def __init__(self) -> None:
         super().__init__()
         self.name = 'AI大模型答题'
-        self.last_request_time = None
+        self._answers_cache = {}
 
-    def _query(self, q_info: dict):
-        def remove_md_json_wrapper(md_str):
-            # 使用正则表达式匹配Markdown代码块并提取内容
-            pattern = r'^\s*```(?:json)?\s*(.*?)\s*```\s*$'
-            match = re.search(pattern, md_str, re.DOTALL)
-            return match.group(1).strip() if match else md_str.strip()
-
-        if self.http_proxy:
-            proxy = self.http_proxy
-            httpx_client = httpx.Client(proxy=proxy)
-            client = OpenAI(http_client=httpx_client, base_url = self.endpoint,api_key = self.key)
-        else:
-            client = OpenAI(base_url = self.endpoint,api_key = self.key)
-        # 去除选项字母，防止大模型直接输出字母而非内容
-        options_list = q_info['options'].split('\n')
-        cleaned_options = [re.sub(r"^[A-Z]\s*", "", option) for option in options_list]
-        options = "\n".join(cleaned_options)
-        # 判断题目类型
-        if q_info['type'] == "single":
-            completion = client.chat.completions.create(
-                model = self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "本题为单选题，你只能选择一个选项，请根据题目和选项回答问题，以json格式输出正确的选项内容，示例回答：{\"Answer\": [\"答案\"]}。除此之外不要输出任何多余的内容，也不要使用MD语法。如果你使用了互联网搜索，也请不要返回搜索的结果和参考资料"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"题目：{q_info['title']}\n选项：{options}"
-                    }
-                ]
-            )
-        elif q_info['type'] == 'multiple':
-            completion = client.chat.completions.create(
-                model = self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "本题为多选题，你必须选择两个或以上选项，请根据题目和选项回答问题，以json格式输出正确的选项内容，示例回答：{\"Answer\": [\"答案1\",\n\"答案2\",\n\"答案3\"]}。除此之外不要输出任何多余的内容，也不要使用MD语法。如果你使用了互联网搜索，也请不要返回搜索的结果和参考资料"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"题目：{q_info['title']}\n选项：{options}"
-                    }
-                ]
-            )
-        elif q_info['type'] == 'completion':
-            completion = client.chat.completions.create(
-                model = self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "本题为填空题，你必须根据语境和相关知识填入合适的内容，请根据题目回答问题，以json格式输出正确的答案，示例回答：{\"Answer\": [\"答案\"]}。除此之外不要输出任何多余的内容，也不要使用MD语法。如果你使用了互联网搜索，也请不要返回搜索的结果和参考资料"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"题目：{q_info['title']}"
-                    }
-                ]
-            )
-        elif q_info['type'] == 'judgement':
-            completion = client.chat.completions.create(
-                model = self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "本题为判断题，你只能回答正确或者错误，请根据题目回答问题，以json格式输出正确的答案，示例回答：{\"Answer\": [\"正确\"]}。除此之外不要输出任何多余的内容，也不要使用MD语法。如果你使用了互联网搜索，也请不要返回搜索的结果和参考资料"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"题目：{q_info['title']}"
-                    }
-                ]
-            )
-        else:
-            completion = client.chat.completions.create(
-                model = self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "本题为简答题，你必须根据语境和相关知识填入合适的内容，请根据题目回答问题，以json格式输出正确的答案，示例回答：{\"Answer\": [\"这是我的答案\"]}。除此之外不要输出任何多余的内容，也不要使用MD语法。如果你使用了互联网搜索，也请不要返回搜索的结果和参考资料"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"题目：{q_info['title']}"
-                    }
-                ]
-            )
-
-        try:
-            if self.last_request_time:
-                interval_time = time.time() - self.last_request_time
-                if interval_time < self.min_interval_seconds:
-                    sleep_time = self.min_interval_seconds - interval_time
-                    logger.debug(f"API请求间隔过短, 等待 {sleep_time} 秒")
-                    time.sleep(sleep_time)
-            self.last_request_time = time.time()
-            response = json.loads(remove_md_json_wrapper(completion.choices[0].message.content))
-            sep = "\n"
-            return sep.join(response['Answer']).strip()
-        except:
-            logger.error("无法解析大模型输出内容")
+    def _query(self, q_info: dict, **kwargs):
+        course_id = kwargs.get('course_id')
+        if not course_id:
+            logger.debug("AI provider: course_id missing in query arguments")
             return None
 
+        # Check cache
+        if course_id not in self._answers_cache:
+             # Load file
+             answers_path = os.path.join("data", str(course_id), "answers.json")
+             if os.path.exists(answers_path):
+                 try:
+                     with open(answers_path, "r", encoding="utf-8") as f:
+                         answers_list = json.load(f)
+                         answers_map = {}
+                         if isinstance(answers_list, list):
+                             for item in answers_list:
+                                 if "id" in item:
+                                     answers_map[str(item["id"])] = item
+                         self._answers_cache[course_id] = answers_map
+                 except Exception as e:
+                     logger.error(f"Failed to load answers for course {course_id}: {e}")
+                     self._answers_cache[course_id] = {}
+             else:
+                 self._answers_cache[course_id] = {}
+
+        answers_map = self._answers_cache[course_id]
+        q_id = str(q_info.get("id"))
+
+        if q_id in answers_map:
+             return answers_map[q_id].get("answer")
+
+        return None
+
     def _init_tiku(self):
-        self.endpoint = self._conf['endpoint']
-        self.key = self._conf['key']
-        self.model = self._conf['model']
-        self.http_proxy = self._conf['http_proxy']
-        self.min_interval_seconds = int(self._conf['min_interval_seconds'])
+        pass
 
 class SiliconFlow(Tiku):
     """硅基流动大模型答题实现"""
@@ -839,7 +764,7 @@ class SiliconFlow(Tiku):
         self.name = '硅基流动大模型'
         self.last_request_time = None
 
-    def _query(self, q_info: dict):
+    def _query(self, q_info: dict, **kwargs):
         def remove_md_json_wrapper(md_str):
             # 解析可能存在的JSON包装
             pattern = r'^\s*```(?:json)?\s*(.*?)\s*```\s*$'
