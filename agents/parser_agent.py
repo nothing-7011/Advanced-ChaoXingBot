@@ -110,6 +110,7 @@ class ImageParserAgent:
 
         collector = QuestionCollector()
         file_path = collector._get_file_path(course_id)
+        plain_file_path = os.path.join(os.path.dirname(file_path), "plain_questions.json")
 
         if not os.path.exists(file_path):
             logger.warning(f"No questions file found for course {course_id}")
@@ -146,12 +147,13 @@ class ImageParserAgent:
                 if original != q['options']:
                     updated_count += 1
 
-        if updated_count > 0:
-            try:
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-                logger.info(f"Updated {updated_count} questions with parsed images for course {course_id}.")
-            except Exception as e:
-                logger.error(f"Failed to save parsed questions: {e}")
-        else:
-            logger.info(f"No images found or parsed for course {course_id}.")
+        try:
+            with open(plain_file_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+            if updated_count > 0:
+                logger.info(f"Updated {updated_count} questions with parsed images. Saved to {plain_file_path}.")
+            else:
+                logger.info(f"No images found or parsed. Saved copy to {plain_file_path}.")
+        except Exception as e:
+            logger.error(f"Failed to save parsed questions to {plain_file_path}: {e}")
