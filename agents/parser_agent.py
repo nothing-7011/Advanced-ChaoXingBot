@@ -14,13 +14,16 @@ from api.logger import logger
 from api.collector import QuestionCollector
 
 class ImageParserAgent:
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7, endpoint: str = None, headers: Dict = None, cookies: Dict = None):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7, endpoint: str = None, headers: Dict = None, cookies: Dict = None, parsed_path: str = "data/parsed.json"):
         self.api_key = api_key
         self.model_name = model_name
         self.temperature = temperature
         self.endpoint = endpoint
         self.headers = headers
         self.cookies = cookies
+        self.parsed_cache_path = parsed_path
+        self.parsed_cache = {}
+        self._load_parsed_cache()
         self.client = None
         if self.api_key:
             try:
@@ -31,6 +34,29 @@ class ImageParserAgent:
                 self.client = genai.Client(api_key=self.api_key, http_options=http_options)
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini client: {e}")
+
+    def _load_parsed_cache(self):
+        if os.path.exists(self.parsed_cache_path):
+            try:
+                with open(self.parsed_cache_path, "r", encoding="utf-8") as f:
+                    self.parsed_cache = json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load parsed cache: {e}")
+
+    def _save_parsed_cache(self):
+        temp_path = self.parsed_cache_path + ".tmp"
+        try:
+            os.makedirs(os.path.dirname(self.parsed_cache_path), exist_ok=True)
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(self.parsed_cache, f, ensure_ascii=False, indent=2)
+            os.replace(temp_path, self.parsed_cache_path)
+        except Exception as e:
+            logger.error(f"Failed to save parsed cache: {e}")
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
 
     def _download_image(self, url: str) -> Image.Image:
         try:
@@ -77,6 +103,13 @@ class ImageParserAgent:
                     logger.warning(f"Skipping potentially relative URL: {url}")
                     continue
 
+            # Check cache
+            if url in self.parsed_cache:
+                logger.info(f"Using cached image text for: {url}")
+                processed_map[url] = self.parsed_cache[url]
+                print(f"[Image Parsed] ...{url[-10:]}: {self.parsed_cache[url]}")
+                continue
+
             logger.info(f"Processing image: {url}")
             image = self._download_image(url)
             if not image:
@@ -93,6 +126,11 @@ class ImageParserAgent:
                 )
                 description = response.text.strip() if response.text else ""
                 processed_map[url] = f" [{description}] "
+
+                # Update cache
+                self.parsed_cache[url] = processed_map[url]
+                self._save_parsed_cache()
+                print(f"[Image Parsed] ...{url[-10:]}: {processed_map[url]}")
             except Exception as e:
                 logger.error(f"Gemini processing failed for {url}: {e}")
                 processed_map[url] = "[图片解析失败]"
