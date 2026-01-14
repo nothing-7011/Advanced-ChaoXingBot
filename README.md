@@ -84,6 +84,13 @@ docker run -it -v /你的路径/config.ini:/config/config.ini chaoxing
 旨在于解决学习通题目中间包含莫名其妙的html 图片标签而大模型不能自主识别的问题。
 原项目仅支持“自测试题”栏目下的题目获取，尽管其他小节（比如“教学内容”）的题目也有被收集，但是选项信息完全对不上，目前没有解决这个问题（程序也不会保存或者提交这些题目的答案）。
 
+你可以用cluster_manager.py来管理下载到的题库包：
+1. 确认你的题库包含questions.json，plain_questions.json和answers.json
+2. 解压到data/sets/下
+3. only_fetch_questions设置为true，运行主程序
+4. 等到程序提示完成了题目获取之后，运行cluster_manager.py
+5. 完成之后将only_fetch_questions设置为false，运行主程序，这次运行时主程序会用题库的结果一次性处理所有习题
+
 ### 配置方法
 1.  在 `[tiku]` 中设置 `provider = AI`。
 2.  配置 `[parser]` (用于解析题目图片) 和 `[solver]` (用于推理答案)。
