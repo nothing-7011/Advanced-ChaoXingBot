@@ -81,6 +81,8 @@ docker run -it -v /你的路径/config.ini:/config/config.ini chaoxing
 ## :sparkles: AI 大模型答题 (Gemini)
 
 本项目新增了基于 Google Gemini 的多模态 AI 答题功能，支持图文识别与智能推理。
+旨在于解决学习通题目中间包含莫名其妙的html 图片标签而大模型不能自主识别的问题。
+原项目仅支持“自测试题”栏目下的题目获取，尽管其他小节（比如“教学内容”）的题目也有被收集，但是选项信息完全对不上，目前没有解决这个问题（程序也不会保存或者提交这些题目的答案）。
 
 ### 配置方法
 1.  在 `[tiku]` 中设置 `provider = AI`。
@@ -89,15 +91,15 @@ docker run -it -v /你的路径/config.ini:/config/config.ini chaoxing
 ```ini
 [tiku]
 provider = AI
-submit = true  ; 是否自动提交
+submit = true  ; 是否自动提交，可以设false
 
 [parser]
-; 用于解析题目图片的 Gemini API Key (必须支持 Vision，如 gemini-2.0-flash)
+; 用于解析题目图片的 Gemini API Key (必须支持 Vision，如 gemini-2.0-flash，实际上只需要有gemini-2.5-flash-lite的多模态能力就可以了)
 gemini_api_key = xxxxxxx
 model = gemini-2.0-flash
 
 [solver]
-; 用于推理答案的 Gemini API Key
+; 用于推理答案的 Gemini API Key (这里可以用CLIProxyAPI转接一个纯文本模型，如 deepseek-reasoner，以我的概率论课程习题为例，用gemini-3-pro-preview直接一遍全对了)
 gemini_api_key = xxxxxxx
 model = gemini-2.0-flash
 request_interval = 2.0  ; 请求间隔(秒)，避免触发限流
