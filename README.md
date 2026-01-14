@@ -14,86 +14,121 @@
         <img src="https://img.shields.io/github/v/release/Samueli924/chaoxing?display_name=tag&sort=semver" alt="version" />
     </a>
 </p>
+
 :muscle: 本项目的最终目的是通过开源消灭所谓的付费刷课平台，希望有能力的朋友都可以为这个项目提交代码，支持本项目的良性发展
 
 :star: 觉得有帮助的朋友可以给个Star
 
-## :point_up: 更新通知
-20241021更新通知： 感谢[sz134055](https://github.com/sz134055)提交代码[PR #360](https://github.com/Samueli924/chaoxing/pull/360)，**添加了对题库答题的支持**  
+## :rocket: 快速开始
 
-## :books: 使用方法
-
-### 源码运行
+### 1. 源码运行
 1. `git clone --depth=1 https://github.com/Samueli924/chaoxing` 项目至本地
 2. `cd chaoxing`
-3. `pip install -r requirements.txt` 或者 `pip install .`(通过 pyproject.toml 安装依赖)
-4. (可选直接运行) `python main.py`
-5. (可选配置文件运行) 复制config_template.ini文件为config.ini文件，修改文件内的账号密码内容, 执行 `python main.py -c config.ini`
-6. (可选命令行运行)`python main.py -u 手机号 -p 密码 -l 课程ID1,课程ID2,课程ID3...(可选) -a [retry|ask|continue](可选)`
+3. `pip install -r requirements.txt` 或者 `pip install .` (通过 pyproject.toml 安装依赖)
+4. **推荐**: 复制 `config_template.ini` 为 `config.ini`，并参照下文配置。
+5. 运行: `python main.py` (会自动读取 `config.ini`)
+   - 也可以使用命令行参数: `python main.py -u 手机号 -p 密码 -l 课程ID1,课程ID2`
 
-### 打包文件运行
-1. 从最新[Releases](https://github.com/Samueli924/chaoxing/releases)中下载exe文件
-2. (可选直接运行) 双击运行即可
-3. (可选配置文件运行) 下载config_template.ini文件保存为config.ini文件，修改文件内的账号密码内容, 执行 `./chaoxing.exe -c config.ini`
-4. (可选命令行运行)`./chaoxing.exe -u "手机号" -p "密码" -l 课程ID1,课程ID2,课程ID3...(可选) -a [retry|ask|continue](可选)`
+### 2. 打包文件运行 (Windows)
+1. 从 [Releases](https://github.com/Samueli924/chaoxing/releases) 下载最新 exe 文件。
+2. 将 `config_template.ini` 下载并重命名为 `config.ini`，放在 exe 同级目录并配置。
+3. 双击运行 exe，或在命令行运行: `./chaoxing.exe`
 
-### Docker运行
-1. 构建Docker镜像
-   ```bash
-   docker build -t chaoxing .
-   ```
-
-2. 运行Docker容器
-   ```bash
-   # 直接运行（将使用默认配置模板）
-   docker run -it chaoxing
-   
-   # 使用自定义配置文件运行
-   docker run -it -v /本地路径/config.ini:/config/config.ini chaoxing
-   ```
-
-3. 配置说明
-   - Docker版本默认使用挂载到 `/config/config.ini` 的配置文件
-   - 首次运行时，会自动将 `config_template.ini` 复制到该位置作为模板
-   - 可以将本地编辑好的配置文件挂载到容器中，按照上述示例命令操作
-
-### 题库配置说明
-
-在你的配置文件中找到`[tiku]`，按照注释填写想要使用的题库名（即`provider`，大小写要一致），并填写必要信息，如token，然后在启动时添加`-c [你的配置文件路径]`即可。
-
-题库会默认使用根目录下的`config.ini`文件中的配置，所以你可以复制配置模板（参照前面的说明）命名为`config.ini`，并只配置题库项`[tiku]`，这样即使你不填写账号之类的信息，不使用`-c`参数指定配置文件，题库也会根据这个配置文件自动配置并启用。
-
-对于那些有章节检测且任务点需要解锁的课程，必须配置题库。
-
-**提交模式与答题**
-不配置题库（既不提供配置文件，也没有放置默认配置文件`config.ini`或填写要使用的题库）视为不使用题库，对于章节检测等需要答题的任务会自动跳过。
-题库覆盖率：搜到的题目占总题目的比例
-提交模式`submit`值为
-
-- `true`：会答完题，达到题库题目覆盖率提交，没达到只保存，**正确率不做保证**。
-- `false`：会答题，但是不会提交，仅保存搜到答案的，随后你可以自行前往学习通查看、修改、提交。**任何填写不正确的`submit`值会被视为`false`**
-
-> 题库名即`answer.py`模块中根据`Tiku`类实现的具体题库类，例如`TikuYanxi`（言溪题库），在填写时，请务必保持大小写一致。
-
-### 已关闭任务点处理配置说明
-
-在配置文件的 `[common]` 部分，可以通过 `notopen_action` 选项配置遇到已关闭任务点时的处理方式:
-
-- `retry` (默认): 遇到关闭的任务点时尝试重新完成上一个任务点，如果连续重试 3 次仍然失败 (或未配置题库及自动提交) 则停止
-- `ask`: 遇到关闭的任务点时询问用户是否继续。选择继续后会自动跳过连续的关闭任务点，直到遇到开放的任务点
-- `continue`: 自动跳过所有关闭的任务点，继续检查和完成后续任务点
-
-也可以通过命令行参数 `-a` 或 `--notopen-action` 指定处理方式，例如：
-
+### 3. Docker 运行
 ```bash
-python main.py -a ask  # 使用询问模式
+# 构建
+docker build -t chaoxing .
+
+# 运行 (挂载配置文件)
+docker run -it -v /你的路径/config.ini:/config/config.ini chaoxing
 ```
 
-**外部通知配置说明**
+---
 
-这功能会在所有课程学习任务结束后，或是程序出现错误时，使用外部通知服务推送消息告知你（~~有用但不多~~）
+## :gear: 配置指南
 
-与题库配置类似，不填写视为不使用，按照注释填写想要使用的外部通知服务（也是`provider`，大小写要一致），并填写必要的`url`
+所有配置项均在 `config.ini` 中设置。建议复制 `config_template.ini` 并修改。
+
+### 1. 基础配置 `[common]`
+| 选项 | 说明 |
+| --- | --- |
+| `use_cookies` | 设为 `true` 则尝试从 `cookies.txt` 登录，忽略账号密码 |
+| `username` | 学习通手机号 |
+| `password` | 学习通密码 |
+| `course_list` | 指定学习的课程 ID (逗号分隔)，留空则学习所有课程 |
+| `speed` | 视频倍速 (默认 1，最大 2) |
+| `jobs` | 并发章节数 (默认 4) |
+| `notopen_action` | 遇到关闭任务点的行为: `retry`(重试), `ask`(询问), `continue`(跳过) |
+
+### 2. 题库配置 `[tiku]`
+用于自动完成章节检测、测验等答题任务。
+
+*   `provider`: 题库提供方 (详情见下文)。
+*   `submit`:
+    *   `true`: 答题并提交 (只有达到 `cover_rate` 覆盖率才会提交，否则只保存)。
+    *   `false`: 只答题并保存，**不提交**。
+*   `cover_rate`: 最低题库覆盖率 (0.0 - 1.0)，达到此比例才允许提交。
+
+#### 支持的题库 (Provider)
+*   `TikuYanxi`: 言溪题库 (需配置 `tokens`)
+*   `TikuLike`: LIKE知识库 (需配置 `tokens`, `likeapi_*` 选项)
+*   `TikuAdapter`: [tikuAdapter](https://github.com/DokiDoki1103/tikuAdapter) 项目 (需配置 `url`)
+*   `SiliconFlow`: 硅基流动 AI (需配置 `siliconflow_key`, `siliconflow_model`)
+*   `AI`: **AI 大模型答题 (Gemini)** (详见下文)
+
+---
+
+## :sparkles: AI 大模型答题 (Gemini)
+
+本项目新增了基于 Google Gemini 的多模态 AI 答题功能，支持图文识别与智能推理。
+
+### 配置方法
+1.  在 `[tiku]` 中设置 `provider = AI`。
+2.  配置 `[parser]` (用于解析题目图片) 和 `[solver]` (用于推理答案)。
+
+```ini
+[tiku]
+provider = AI
+submit = true  ; 是否自动提交
+
+[parser]
+; 用于解析题目图片的 Gemini API Key (必须支持 Vision，如 gemini-2.0-flash)
+gemini_api_key = xxxxxxx
+model = gemini-2.0-flash
+
+[solver]
+; 用于推理答案的 Gemini API Key
+gemini_api_key = xxxxxxx
+model = gemini-2.0-flash
+request_interval = 2.0  ; 请求间隔(秒)，避免触发限流
+```
+
+### :warning: 使用流程 (重要)
+
+由于 AI 答题包含 "收集题目 -> 解析图片 -> 推理答案" 的耗时过程，你需要**运行程序两次**才能完成提交：
+
+1.  **第一次运行**:
+    *   程序会遍历课程，收集所有题目到 `data/{courseId}/questions.json`。
+    *   遍历结束后，自动启动 **Parser Agent** 解析题目中的图片。
+    *   随后启动 **Solver Agent** 进行推理，生成答案并保存到 `data/{courseId}/answers.json`。
+    *   *此时任务点尚未提交*。
+
+2.  **第二次运行**:
+    *   程序再次遍历课程，读取上一步生成的 `answers.json`。
+    *   如果答案完整，则自动填入并提交任务点。
+
+> **注意**: 请确保你的网络环境可以连接 Google Gemini API，或在配置中设置反代 `endpoint`。
+
+---
+
+## :bell: 通知配置 `[notification]`
+任务完成后发送通知。
+
+*   `provider`: 支持 `ServerChan`, `Qmsg`, `Bark`, `Telegram`。
+*   `url`: 对应的 Webhook URL 或 API 地址。
+*   `tg_chat_id`: Telegram 专用 Chat ID。
+
+---
 
 ## :heart: CONTRIBUTORS
 
@@ -104,6 +139,6 @@ python main.py -a ask  # 使用询问模式
 </a>
 
 ## :warning: 免责声明
-- 本代码遵循 [GPL-3.0 License](https://github.com/Samueli924/chaoxing/blob/main/LICENSE) 协议，允许**开源/免费使用和引用/修改/衍生代码的开源/免费使用**，不允许**修改和衍生的代码作为闭源的商业软件发布和销售**，禁止**使用本代码盈利**，以此代码为基础的程序**必须**同样遵守 [GPL-3.0 License](https://github.com/Samueli924/chaoxing/blob/main/LICENSE) 协议
-- 本代码仅用于**学习讨论**，禁止**用于盈利**
-- 他人或组织使用本代码进行的任何**违法行为**与本人无关
+- 本代码遵循 [GPL-3.0 License](https://github.com/Samueli924/chaoxing/blob/main/LICENSE) 协议。
+- 本代码仅用于**学习讨论**，禁止**用于盈利**。
+- 他人或组织使用本代码进行的任何**违法行为**与本人无关。
