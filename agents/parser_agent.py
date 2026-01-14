@@ -14,11 +14,13 @@ from api.logger import logger
 from api.collector import QuestionCollector
 
 class ImageParserAgent:
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7, endpoint: str = None):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7, endpoint: str = None, headers: Dict = None, cookies: Dict = None):
         self.api_key = api_key
         self.model_name = model_name
         self.temperature = temperature
         self.endpoint = endpoint
+        self.headers = headers
+        self.cookies = cookies
         self.client = None
         if self.api_key:
             try:
@@ -35,7 +37,7 @@ class ImageParserAgent:
             # Simple retry mechanism
             for _ in range(3):
                 try:
-                    resp = requests.get(url, timeout=15)
+                    resp = requests.get(url, headers=self.headers, cookies=self.cookies, timeout=15)
                     if resp.status_code == 200:
                         return Image.open(BytesIO(resp.content))
                 except requests.RequestException:
