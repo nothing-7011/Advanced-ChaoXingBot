@@ -7,7 +7,7 @@ import threading
 import time
 import traceback
 from concurrent.futures.thread import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from queue import PriorityQueue
 try:
     from queue import ShutDown
@@ -270,9 +270,9 @@ def process_job(chaoxing: Chaoxing, course: dict, job: dict, job_info: dict, spe
 @dataclass(order=True)
 class ChapterTask:
     index: int
-    point: dict[str, Any]
-    result: ChapterResult = ChapterResult.PENDING
-    tries: int = 0
+    point: dict[str, Any] = field(compare=False)
+    result: ChapterResult = field(default=ChapterResult.PENDING, compare=False)
+    tries: int = field(default=0, compare=False)
 
 class JobProcessor:
     def __init__(self, chaoxing: Chaoxing, course: dict[str, Any], tasks: list[ChapterTask], config: dict[str, Any]):
@@ -309,7 +309,7 @@ class JobProcessor:
             self.task_queue.shutdown()
         else:
             for _ in range(self.worker_num):
-                self.task_queue.put(None)
+                self.task_queue.put(ChapterTask(index=float('inf'), point={}))
 
 
     @log_error
@@ -318,7 +318,7 @@ class JobProcessor:
         while True:
             try:
                 task = self.task_queue.get()
-                if task is None:
+                if task is None or task.index == float('inf'):
                     return
             except ShutDown:
                 logger.info("Queue shut down")
