@@ -118,7 +118,7 @@ class ImageParserAgent:
                 continue
 
             try:
-                prompt = "Identify the content of this image. If it contains mathematical formulas, convert them to LaTeX format. Return only the plain text result."
+                prompt = "Identify the content of this image. If it contains mathematical formulas, convert them to LaTeX format. Return only the plain text result. Do not modify any content within the image, including the original language (e.g., Chinese)."
                 response = self.client.models.generate_content(
                     model=self.model_name,
                     contents=[image, prompt],
