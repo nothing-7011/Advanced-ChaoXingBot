@@ -136,6 +136,8 @@ def load_config_from_file(config_path):
         for key in ["delay", "cover_rate"]:
             if key in tiku_config:
                 tiku_config[key] = float(tiku_config[key])
+        if "only_fetch_questions" in tiku_config:
+            tiku_config["only_fetch_questions"] = str_to_bool(tiku_config["only_fetch_questions"])
 
     # 检查并读取notification节
     if config.has_section("notification"):
@@ -542,32 +544,38 @@ def main():
 
         # 检查是否需要运行Parser Agent
         if tiku_config.get("provider") == "AI" and parser_config.get("gemini_api_key"):
-            logger.info("检测到AI答题模式，开始运行Parser Agent进行图片解析...")
-            from agents.parser_agent import ImageParserAgent
-            agent = ImageParserAgent(
-                api_key=parser_config["gemini_api_key"],
-                model_name=parser_config.get("model", "gemini-2.0-flash"),
-                temperature=float(parser_config.get("temperature", 0.7)),
-                endpoint=parser_config.get("endpoint"),
-                headers=SessionManager.get_session().headers,
-                cookies=SessionManager.get_session().cookies.get_dict()
-            )
-            for course in course_task:
-                agent.parse_images(course["courseId"])
+            if not tiku_config.get("only_fetch_questions", False):
+                logger.info("检测到AI答题模式，开始运行Parser Agent进行图片解析...")
+                from agents.parser_agent import ImageParserAgent
+                agent = ImageParserAgent(
+                    api_key=parser_config["gemini_api_key"],
+                    model_name=parser_config.get("model", "gemini-2.0-flash"),
+                    temperature=float(parser_config.get("temperature", 0.7)),
+                    endpoint=parser_config.get("endpoint"),
+                    headers=SessionManager.get_session().headers,
+                    cookies=SessionManager.get_session().cookies.get_dict()
+                )
+                for course in course_task:
+                    agent.parse_images(course["courseId"])
+            else:
+                logger.info("检测到AI答题模式，但已开启仅获取题目模式，跳过Parser Agent")
 
         # 检查是否需要运行Solver Agent
         if tiku_config.get("provider") == "AI" and solver_config.get("gemini_api_key"):
-            logger.info("检测到AI答题模式，开始运行Solver Agent进行题目求解...")
-            from agents.solver_agent import SolverAgent
-            agent = SolverAgent(
-                api_key=solver_config["gemini_api_key"],
-                model_name=solver_config.get("model", "gemini-2.0-flash"),
-                temperature=float(solver_config.get("temperature", 0.7)),
-                request_interval=float(solver_config.get("request_interval", 2.0)),
-                endpoint=solver_config.get("endpoint")
-            )
-            for course in course_task:
-                agent.solve_questions(course["courseId"])
+            if not tiku_config.get("only_fetch_questions", False):
+                logger.info("检测到AI答题模式，开始运行Solver Agent进行题目求解...")
+                from agents.solver_agent import SolverAgent
+                agent = SolverAgent(
+                    api_key=solver_config["gemini_api_key"],
+                    model_name=solver_config.get("model", "gemini-2.0-flash"),
+                    temperature=float(solver_config.get("temperature", 0.7)),
+                    request_interval=float(solver_config.get("request_interval", 2.0)),
+                    endpoint=solver_config.get("endpoint")
+                )
+                for course in course_task:
+                    agent.solve_questions(course["courseId"])
+            else:
+                logger.info("检测到AI答题模式，但已开启仅获取题目模式，跳过Solver Agent")
         
         logger.info("所有课程学习任务已完成")
         notification.send("chaoxing : 所有课程学习任务已完成")
