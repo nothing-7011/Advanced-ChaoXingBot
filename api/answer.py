@@ -188,6 +188,13 @@ class Tiku:
         # 仅用于题库初始化, 例如配置token, 交由自定义题库完成
         pass
 
+    def is_completed(self, course_id: str) -> bool:
+        """
+        Check if the answers for the course are completed.
+        For most providers, this is always True.
+        """
+        return True
+
     def config_set(self,config):
         self._conf = config
 
@@ -232,7 +239,10 @@ class Tiku:
                     logger.info(f"从{self.name}获取到的答案类型与题目类型不符，已舍弃")
                     return None
 
-            logger.error(f"从{self.name}获取答案失败：{q_info['title']}")
+            if self.name == 'AI大模型答题':
+                logger.info(f"AI模式: 题目已收集: {q_info['title']}")
+            else:
+                logger.error(f"从{self.name}获取答案失败：{q_info['title']}")
         return None
 
 
@@ -722,6 +732,7 @@ class AI(Tiku):
         super().__init__()
         self.name = 'AI大模型答题'
         self._answers_cache = {}
+        self._completed_cache = {}
 
     def _query(self, q_info: dict, **kwargs):
         course_id = kwargs.get('course_id')
@@ -736,12 +747,18 @@ class AI(Tiku):
              if os.path.exists(answers_path):
                  try:
                      with open(answers_path, "r", encoding="utf-8") as f:
-                         answers_list = json.load(f)
+                         data = json.load(f)
+                         answers_list = []
+                         if isinstance(data, list):
+                             answers_list = data
+                         elif isinstance(data, dict):
+                             answers_list = data.get("answers", [])
+                             self._completed_cache[course_id] = data.get("completed", False)
+
                          answers_map = {}
-                         if isinstance(answers_list, list):
-                             for item in answers_list:
-                                 if "id" in item:
-                                     answers_map[str(item["id"])] = item
+                         for item in answers_list:
+                             if "id" in item:
+                                 answers_map[str(item["id"])] = item
                          self._answers_cache[course_id] = answers_map
                  except Exception as e:
                      logger.error(f"Failed to load answers for course {course_id}: {e}")
@@ -756,6 +773,23 @@ class AI(Tiku):
              return answers_map[q_id].get("answer")
 
         return None
+
+    def is_completed(self, course_id: str) -> bool:
+        if course_id in self._completed_cache:
+            return self._completed_cache[course_id]
+
+        answers_path = os.path.join("data", str(course_id), "answers.json")
+        if os.path.exists(answers_path):
+            try:
+                with open(answers_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        is_finished = data.get("completed", False)
+                        self._completed_cache[course_id] = is_finished
+                        return is_finished
+            except Exception:
+                pass
+        return False
 
     def _init_tiku(self):
         pass
