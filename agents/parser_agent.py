@@ -73,6 +73,28 @@ class ImageParserAgent:
             logger.error(f"Failed to download image {url}: {e}")
         return None
 
+    def _process_image(self, image: Image.Image) -> Image.Image:
+        """
+        Process the image to ensure it's in a supported format (RGB).
+        Handles transparency by compositing on a white background.
+        """
+        if image.mode == 'RGB':
+            return image
+
+        try:
+            # Handle transparency
+            if image.mode in ('RGBA', 'LA') or (image.mode == 'P' and 'transparency' in image.info):
+                image = image.convert("RGBA")
+                background = Image.new("RGB", image.size, (255, 255, 255))
+                background.paste(image, mask=image.split()[3])
+                return background
+
+            return image.convert("RGB")
+        except Exception as e:
+            logger.error(f"Failed to process image format: {e}")
+            # Fallback to converting to RGB directly if complex processing fails
+            return image.convert("RGB")
+
     def _process_text_with_images(self, text: str) -> str:
         if not text:
             return text
@@ -116,6 +138,9 @@ class ImageParserAgent:
                 logger.error(f"Failed to download: {url}")
                 processed_map[url] = "[图片下载失败]"
                 continue
+
+            # Process image to handle transparency and format
+            image = self._process_image(image)
 
             try:
                 prompt = "Identify the content of this image. If it contains mathematical formulas, convert them to LaTeX format. Return only the plain text result. Do not modify any content within the image, including the original language (e.g., Chinese)."
