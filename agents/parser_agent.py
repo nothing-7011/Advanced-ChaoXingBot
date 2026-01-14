@@ -7,15 +7,17 @@ from io import BytesIO
 from typing import List, Dict, Any
 
 from google import genai
+from google.genai import types
 from PIL import Image
 
 from api.logger import logger
 from api.collector import QuestionCollector
 
 class ImageParserAgent:
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash"):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7):
         self.api_key = api_key
         self.model_name = model_name
+        self.temperature = temperature
         self.client = None
         if self.api_key:
             try:
@@ -79,7 +81,8 @@ class ImageParserAgent:
                 prompt = "Identify the content of this image. If it contains mathematical formulas, convert them to LaTeX format. Return only the plain text result."
                 response = self.client.models.generate_content(
                     model=self.model_name,
-                    contents=[image, prompt]
+                    contents=[image, prompt],
+                    config=types.GenerateContentConfig(temperature=self.temperature)
                 )
                 description = response.text.strip() if response.text else ""
                 processed_map[url] = f" [{description}] "
