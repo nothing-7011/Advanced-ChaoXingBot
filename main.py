@@ -20,7 +20,7 @@ from typing import Any
 from tqdm import tqdm
 
 from api.answer import Tiku
-from api.base import Chaoxing, Account, StudyResult
+from api.base import Chaoxing, Account, StudyResult, SessionManager
 from api.exceptions import LoginError, InputFormatError
 from api.logger import logger
 from api.notification import Notification
@@ -548,7 +548,9 @@ def main():
                 api_key=parser_config["gemini_api_key"],
                 model_name=parser_config.get("model", "gemini-2.0-flash"),
                 temperature=float(parser_config.get("temperature", 0.7)),
-                endpoint=parser_config.get("endpoint")
+                endpoint=parser_config.get("endpoint"),
+                headers=SessionManager.get_session().headers,
+                cookies=SessionManager.get_session().cookies.get_dict()
             )
             for course in course_task:
                 agent.parse_images(course["courseId"])
