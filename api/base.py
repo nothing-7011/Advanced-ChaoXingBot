@@ -778,9 +778,12 @@ class Chaoxing:
             res = self.tiku.query(q, course_id=_course['courseId'])
             answer = ""
             if not res:
-                # 随机答题
-                answer = random_answer(q["options"])
-                q[f'answerSource{q["id"]}'] = "random"
+                if self.tiku.name == 'AI大模型答题':
+                    pass
+                else:
+                    # 随机答题
+                    answer = random_answer(q["options"])
+                    q[f'answerSource{q["id"]}'] = "random"
             else:
                 # 根据响应结果选择答案
                 if q["type"] == "multiple":
@@ -808,7 +811,11 @@ class Chaoxing:
                                 answer = o[:1]
                                 break
                 elif q["type"] == "judgement":
-                    answer = "true" if self.tiku.judgement_select(res) else "false"
+                    judgement_res = self.tiku.judgement_select(res)
+                    if judgement_res is None:
+                        answer = ""
+                    else:
+                        answer = "true" if judgement_res else "false"
                 elif q["type"] == "completion":
                     if isinstance(res, list):
                         answer = "".join(res)

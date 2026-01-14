@@ -266,7 +266,7 @@ class Tiku:
         new_cls.config_set(self._conf)
         return new_cls
 
-    def judgement_select(self, answer: str) -> bool:
+    def judgement_select(self, answer: str) -> Optional[bool]:
         """
         这是一个专用的方法, 要求配置维护两个选项列表, 一份用于正确选项, 一份用于错误选项, 以应对题库对判断题答案响应的各种可能的情况
         它的作用是将获取到的答案answer与可能的选项列对比并返回对应的布尔值
@@ -280,6 +280,9 @@ class Tiku:
         elif answer in self.false_list:
             return False
         else:
+            if self.name == 'AI大模型答题':
+                logger.warning(f'AI模式无法判断答案 -> {answer}, 跳过随机选择')
+                return None
             # 无法判断, 随机选择
             logger.error(f'无法判断答案 -> {answer} 对应的是正确还是错误, 请自行判断并加入配置文件重启脚本, 本次将会随机选择选项')
             return random.choice([True,False])
