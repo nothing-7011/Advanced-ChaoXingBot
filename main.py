@@ -106,6 +106,7 @@ def load_config_from_file(config_path):
     tiku_config: dict[str, Any] = {}
     notification_config: dict[str, Any] = {}
     parser_config: dict[str, Any] = {}
+    solver_config: dict[str, Any] = {}
     
     # 检查并读取common节
     if config.has_section("common"):
@@ -142,8 +143,11 @@ def load_config_from_file(config_path):
 
     if config.has_section("parser"):
         parser_config = dict(config.items("parser"))
+
+    if config.has_section("solver"):
+        solver_config = dict(config.items("solver"))
     
-    return common_config, tiku_config, notification_config, parser_config
+    return common_config, tiku_config, notification_config, parser_config, solver_config
 
 
 def build_config_from_args(args):
@@ -157,7 +161,7 @@ def build_config_from_args(args):
         "jobs": args.jobs,
         "notopen_action": args.notopen_action if args.notopen_action else "retry"
     }
-    return common_config, {}, {}, {}
+    return common_config, {}, {}, {}, {}
 
 
 def init_config():
@@ -505,7 +509,7 @@ def main():
     """主程序入口"""
     try:
         # 初始化配置
-        common_config, tiku_config, notification_config, parser_config = init_config()
+        common_config, tiku_config, notification_config, parser_config, solver_config = init_config()
         
         # 强制播放按照配置文件调节
         common_config["speed"] = min(2.0, max(1.0, common_config.get("speed", 1.0)))
@@ -542,10 +546,25 @@ def main():
             from agents.parser_agent import ImageParserAgent
             agent = ImageParserAgent(
                 api_key=parser_config["gemini_api_key"],
-                model_name=parser_config.get("model", "gemini-2.0-flash")
+                model_name=parser_config.get("model", "gemini-2.0-flash"),
+                temperature=float(parser_config.get("temperature", 0.7))
             )
             for course in course_task:
                 agent.parse_images(course["courseId"])
+
+        # 检查是否需要运行Solver Agent
+        if tiku_config.get("provider") == "AI" and solver_config.get("gemini_api_key"):
+            logger.info("检测到AI答题模式，开始运行Solver Agent进行题目求解...")
+            from agents.solver_agent import SolverAgent
+            agent = SolverAgent(
+                api_key=solver_config["gemini_api_key"],
+                model_name=solver_config.get("model", "gemini-2.0-flash"),
+                temperature=float(solver_config.get("temperature", 0.7)),
+                request_interval=float(solver_config.get("request_interval", 2.0)),
+                endpoint=solver_config.get("endpoint")
+            )
+            for course in course_task:
+                agent.solve_questions(course["courseId"])
         
         logger.info("所有课程学习任务已完成")
         notification.send("chaoxing : 所有课程学习任务已完成")
