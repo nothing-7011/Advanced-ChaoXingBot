@@ -764,7 +764,6 @@ class Chaoxing:
         if self.tiku.name == 'AI大模型答题':
             logger.info("当前为大模型答题模式，正在收集题目信息...")
             QuestionCollector().add_questions(_course['courseId'], questions.get("questions", []))
-            return StudyResult.SUCCESS
 
         _ORIGIN_HTML_CONTENT = final_resp.text  # 用于配合输出网页源码, 帮助修复#391错误
 
@@ -776,7 +775,7 @@ class Chaoxing:
             # 添加搜题延迟 #428 - 默认0s延迟
             query_delay = self.kwargs.get("query_delay", 0)
             time.sleep(query_delay)
-            res = self.tiku.query(q)
+            res = self.tiku.query(q, course_id=_course['courseId'])
             answer = ""
             if not res:
                 # 随机答题
@@ -820,9 +819,14 @@ class Chaoxing:
                     answer = res
 
                 if not answer:  # 检查 answer 是否为空
-                    logger.warning(f"找到答案但答案未能匹配 -> {res}\t随机选择答案")
-                    answer = random_answer(q["options"])  # 如果为空，则随机选择答案
-                    q[f'answerSource{q["id"]}'] = "random"
+                    if self.tiku.name == 'AI大模型答题':
+                        logger.warning(f"AI模式未找到答案，跳过随机猜测")
+                        answer = ""
+                        q[f'answerSource{q["id"]}'] = "none"
+                    else:
+                        logger.warning(f"找到答案但答案未能匹配 -> {res}\t随机选择答案")
+                        answer = random_answer(q["options"])  # 如果为空，则随机选择答案
+                        q[f'answerSource{q["id"]}'] = "random"
                 else:
                     logger.info(f"成功获取到答案：{answer}")
                     q[f'answerSource{q["id"]}'] = "cover"

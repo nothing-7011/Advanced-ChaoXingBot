@@ -14,14 +14,19 @@ from api.logger import logger
 from api.collector import QuestionCollector
 
 class ImageParserAgent:
-    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7):
+    def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7, endpoint: str = None):
         self.api_key = api_key
         self.model_name = model_name
         self.temperature = temperature
+        self.endpoint = endpoint
         self.client = None
         if self.api_key:
             try:
-                self.client = genai.Client(api_key=self.api_key)
+                http_options = None
+                if self.endpoint:
+                    http_options = types.HttpOptions(base_url=self.endpoint)
+
+                self.client = genai.Client(api_key=self.api_key, http_options=http_options)
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini client: {e}")
 
