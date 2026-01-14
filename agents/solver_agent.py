@@ -61,17 +61,31 @@ class SolverAgent:
         if os.path.exists(answers_path):
             try:
                 with open(answers_path, "r", encoding="utf-8") as f:
-                    existing_answers = json.load(f)
-                    if isinstance(existing_answers, list):
-                        for item in existing_answers:
-                            if "id" in item:
-                                answers_map[str(item["id"])] = item
+                    existing_data = json.load(f)
+                    existing_answers = []
+                    if isinstance(existing_data, list):
+                        existing_answers = existing_data
+                    elif isinstance(existing_data, dict):
+                        existing_answers = existing_data.get("answers", [])
+
+                    for item in existing_answers:
+                        if "id" in item:
+                            answers_map[str(item["id"])] = item
             except Exception as e:
                 logger.error(f"Failed to load existing answers: {e}")
 
         logger.info(f"Starting solving {len(questions)} questions for course {course_id}...")
 
         solved_count = 0
+
+        def save_progress():
+            is_completed = True
+            for q in questions:
+                q_id = str(q.get("id"))
+                if q_id and q_id not in answers_map:
+                    is_completed = False
+                    break
+            self._save_answers(answers_path, answers_map, is_completed)
 
         for q in questions:
             q_id = str(q.get("id"))
@@ -138,18 +152,25 @@ Example: {{"answer": "Correct Answer"}}
                     }
                     solved_count += 1
 
-                    self._save_answers(answers_path, answers_map)
+                    save_progress()
 
             except Exception as e:
                 logger.error(f"Failed to solve question {q_id}: {e}")
 
+        # Final check to ensure completion status is updated even if no new questions were solved
+        save_progress()
+
         logger.info(f"Finished solving. New answers: {solved_count}. Total answers: {len(answers_map)}.")
 
-    def _save_answers(self, path: str, answers_map: Dict):
+    def _save_answers(self, path: str, answers_map: Dict, is_completed: bool):
         try:
             # Convert map back to list
             answers_list = list(answers_map.values())
+            output_data = {
+                "completed": is_completed,
+                "answers": answers_list
+            }
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(answers_list, f, ensure_ascii=False, indent=2)
+                json.dump(output_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Failed to save answers to {path}: {e}")
