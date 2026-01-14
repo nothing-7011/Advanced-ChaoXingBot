@@ -34,12 +34,14 @@ class SolverAgent:
             return
 
         collector = QuestionCollector()
-        questions_path = collector._get_file_path(course_id)
+        original_questions_path = collector._get_file_path(course_id)
+        # Use plain_questions.json as source
+        questions_path = os.path.join(os.path.dirname(original_questions_path), "plain_questions.json")
         # answers.json path in the same directory
-        answers_path = os.path.join(os.path.dirname(questions_path), "answers.json")
+        answers_path = os.path.join(os.path.dirname(original_questions_path), "answers.json")
 
         if not os.path.exists(questions_path):
-            logger.warning(f"No questions file found for course {course_id}")
+            logger.error(f"plain_questions.json not found at {questions_path}. Please run Parser Agent first.")
             return
 
         try:
