@@ -5,9 +5,14 @@ from typing import List, Dict, Any
 
 from google import genai
 from google.genai import types
+from pydantic import BaseModel, Field
 
 from api.logger import logger
 from api.collector import QuestionCollector
+
+class QuestionSolution(BaseModel):
+    thinking: str = Field(description="Step-by-step reasoning details")
+    answer: str = Field(description="The final answer. For choice questions, return the option letters (e.g., 'A', 'AC'). For judgment, return '正确' or '错误'. For completion, return the text.")
 
 class SolverAgent:
     def __init__(self, api_key: str, model_name: str = "gemini-2.0-flash", temperature: float = 0.7, request_interval: float = 2.0, endpoint: str = None):
@@ -113,10 +118,10 @@ Type: {q_type}
 Question: {title}
 Options: {options}
 
-Return the answer in JSON format with a single key "answer".
-For multiple choice, return the option content (not just A/B/C).
-For completion/judgment, return the text answer.
-Example: {{"answer": "Correct Answer"}}
+Please think step-by-step and provide the answer.
+For single/multiple choice questions, return the Option Letters (e.g., "A", "AB", "AC").
+For judgment questions, return "正确" or "错误".
+For completion questions, return the answer text.
 """
 
             try:
@@ -125,23 +130,30 @@ Example: {{"answer": "Correct Answer"}}
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         temperature=self.temperature,
-                        response_mime_type="application/json"
+                        response_mime_type="application/json",
+                        response_schema=QuestionSolution,
                     )
                 )
 
                 answer_text = ""
                 if response.text:
                     try:
-                        # Parse JSON response
-                        res_json = json.loads(response.text)
-                        answer_text = res_json.get("answer", "")
-                        # Handle list if model returns list of answers
-                        if isinstance(answer_text, list):
-                            answer_text = " ".join([str(x) for x in answer_text])
-                        answer_text = str(answer_text).strip()
-                    except json.JSONDecodeError:
-                        logger.warning(f"Failed to parse JSON response for question {q_id}. Raw: {response.text}")
-                        answer_text = response.text.strip()
+                        # Parse JSON response using Pydantic
+                        solution = QuestionSolution.model_validate_json(response.text)
+                        answer_text = solution.answer.strip()
+                        if hasattr(solution, 'thinking'):
+                            logger.debug(f"Question {q_id} thinking: {solution.thinking}")
+                    except Exception as e:
+                        logger.warning(f"Failed to parse structured response for question {q_id}: {e}. Raw: {response.text}")
+                        # Fallback parsing
+                        try:
+                            res_json = json.loads(response.text)
+                            answer_text = res_json.get("answer", "")
+                            if isinstance(answer_text, list):
+                                answer_text = " ".join([str(x) for x in answer_text])
+                            answer_text = str(answer_text).strip()
+                        except:
+                            answer_text = response.text.strip()
 
                 if answer_text:
                     logger.info(f"Solved question {q_id}: {answer_text[:50]}...")

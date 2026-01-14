@@ -790,7 +790,12 @@ class Chaoxing:
                     q[f'answerSource{q["id"]}'] = "random"
             else:
                 # 根据响应结果选择答案
-                if q["type"] == "multiple":
+                if self.tiku.name == 'AI大模型答题' and q["type"] in ["single", "multiple"]:
+                    # AI模式且为选择题，直接使用返回的标号（例如 "A", "AC"）
+                    # 简单的过滤，只保留字母
+                    filtered_res = "".join([c for c in res if c.isalpha()])
+                    answer = "".join(sorted(list(set(filtered_res.upper()))))
+                elif q["type"] == "multiple":
                     # 多选处理
                     options_list = multi_cut(q["options"])
                     res_list = multi_cut(res)

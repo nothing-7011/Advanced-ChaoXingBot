@@ -1,3 +1,5 @@
+import re
+
 def check_single(answer):
     _t = cut(answer)
     if _t is not None and len(_t) == 1:
@@ -30,6 +32,18 @@ def check_completion(answer):
 
 
 def check_answer(answer, type, tiku):  # 只会写小杯代码，这里用个tiku感觉怪怪的，但先这么写着
+    if getattr(tiku, 'name', '') == 'AI大模型答题':
+        if type in ['single', 'multiple']:
+            return bool(re.fullmatch(r'[A-Za-z]+', answer)) and check_judgement(answer, tiku.true_list, tiku.false_list) == -1
+        elif type == 'judgement':
+            if check_judgement(answer, tiku.true_list, tiku.false_list) != -1:
+                return True
+            return False
+        elif type == 'completion':
+            return check_completion(answer)
+        else:
+            return True
+
     if type == 'single':
         if check_single(answer) and check_judgement(answer, tiku.true_list, tiku.false_list) == -1:
             return True
