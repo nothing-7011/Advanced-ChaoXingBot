@@ -128,5 +128,73 @@ class TestReproduction(unittest.TestCase):
 
             print("KeyError fix verified.")
 
+    @patch("api.base.SessionManager")
+    def test_completion_submission_format(self, mock_sm):
+        # Mocking Tiku
+        mock_tiku = MagicMock(spec=Tiku)
+        mock_tiku.name = 'AI大模型答题'
+        mock_tiku.query.return_value = "MyAnswer"
+        mock_tiku.DISABLE = False
+        mock_tiku.COVER_RATE = 0.8
+        mock_tiku.get_submit_params.return_value = "1" # Save mode
+
+        # Mocking Chaoxing
+        account = Account("user", "pass")
+        cx = Chaoxing(account=account, tiku=mock_tiku)
+
+        # Prepare inputs
+        course = {"courseId": "1001", "clazzId": "2001", "cpi": "3001"}
+        job = {"jobid": "work-12345", "enc": "enc_val"}
+        job_info = {"knowledgeid": "k1", "ktoken": "kt", "cpi": "3001"}
+
+        # Mock Session and Responses
+        mock_session = MagicMock()
+        mock_sm.get_session.return_value = mock_session
+
+        # Mock responses
+        mock_resp_get = MagicMock()
+        mock_resp_get.status_code = 200
+        # Minimal HTML reproducing the completion question structure
+        mock_resp_get.text = """
+        <html>
+        <form>
+            <input type="hidden" name="tiankongsize123" value="1">
+            <div class="singleQuesId" data="123">
+                <div class="TiMu newTiMu" data="2">
+                    <div class="Zy_TItle">Title</div>
+                </div>
+                <div class="clearfix">
+                    <textarea name="answerEditor1231" id="answerEditor1231"></textarea>
+                </div>
+            </div>
+        </form>
+        </html>
+        """
+
+        mock_session.get.return_value = mock_resp_get
+
+        # The POST request (submission)
+        mock_resp_post = MagicMock()
+        mock_resp_post.status_code = 200
+        mock_resp_post.json.return_value = {"status": True, "msg": "Saved"}
+        mock_session.post.return_value = mock_resp_post
+
+        # Run study_work
+        # Note: We are NOT mocking decode_questions_info here, so we test the integration of decode and base
+        cx.study_work(course, job, job_info)
+
+        # Verify POST data
+        mock_session.post.assert_called()
+        args, kwargs = mock_session.post.call_args
+        data = kwargs['data']
+
+        print("Posted data:", data)
+
+        # We expect answerEditor1231 to be present and have value "MyAnswer"
+        self.assertIn("answerEditor1231", data)
+        self.assertEqual(data["answerEditor1231"], "MyAnswer")
+        # Ensure tiankongsize is also there
+        self.assertIn("tiankongsize123", data)
+
 if __name__ == "__main__":
     unittest.main()
