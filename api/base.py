@@ -824,7 +824,10 @@ class Chaoxing:
                         answer = "true" if judgement_res else "false"
                 elif q["type"] == "completion":
                     if isinstance(res, list):
-                        answer = "".join(res)
+                        # 填空题如果是列表，使用换行符拼接，以支持多个空
+                        # 过滤掉 None 和空字符串
+                        valid_answers = [str(x) for x in res if x is not None and str(x).strip()]
+                        answer = "\n".join(valid_answers)
                     elif isinstance(res, str):
                         answer = res
                 else:
