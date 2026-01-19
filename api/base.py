@@ -824,7 +824,7 @@ class Chaoxing:
                         answer = "true" if judgement_res else "false"
                 elif q["type"] == "completion":
                     if isinstance(res, list):
-                        answer = "".join(res)
+                        answer = res
                     elif isinstance(res, str):
                         answer = res
                 else:
@@ -845,7 +845,19 @@ class Chaoxing:
                     q[f'answerSource{q["id"]}'] = "cover"
                     found_answers += 1
             # 填充答案
-            q["answerField"][f'answer{q["id"]}'] = answer
+            if q["type"] == "completion":
+                editor_keys = sorted([k for k in q["answerField"].keys() if k.startswith("answerEditor")])
+                if editor_keys:
+                    if isinstance(answer, list):
+                        for i, key in enumerate(editor_keys):
+                            if i < len(answer):
+                                q["answerField"][key] = answer[i]
+                    else:
+                        q["answerField"][editor_keys[0]] = answer
+                else:
+                    q["answerField"][f'answer{q["id"]}'] = answer
+            else:
+                q["answerField"][f'answer{q["id"]}'] = answer
             logger.info(f'{q["title"]} 填写答案为 {answer}')
         cover_rate = (found_answers / total_questions) * 100
         logger.info(f"章节检测题库覆盖率： {cover_rate:.0f}%")
@@ -860,21 +872,18 @@ class Chaoxing:
         # 组建提交表单
         if questions["pyFlag"] == "1":
             for q in questions["questions"]:
-                questions.update(
-                    {
-                        f'answer{q["id"]}':
-                            q["answerField"][f'answer{q["id"]}'] if q[f'answerSource{q["id"]}'] == "cover" else '',
-                        f'answertype{q["id"]}': q["answerField"][f'answertype{q["id"]}'],
-                    }
-                )
+                for key, val in q["answerField"].items():
+                    if key.startswith("answer") and not key.startswith("answertype"):
+                        if q.get(f'answerSource{q["id"]}') == "cover":
+                            questions[key] = val
+                        else:
+                            questions[key] = ""
+                    else:
+                        questions[key] = val
         else:
             for q in questions["questions"]:
-                questions.update(
-                    {
-                        f'answer{q["id"]}': q["answerField"][f'answer{q["id"]}'],
-                        f'answertype{q["id"]}': q["answerField"][f'answertype{q["id"]}'],
-                    }
-                )
+                for key, val in q["answerField"].items():
+                    questions[key] = val
 
         del questions["questions"]
 

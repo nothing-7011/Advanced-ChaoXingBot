@@ -449,16 +449,27 @@ def _process_question(div_tag, font_decoder=None) -> Dict[str, Any]:
     # 排序选项
     q_options.sort()
     q_options = '\n'.join(q_options)
-    
+
+    answer_field = {}
+    if q_type == "completion":
+        # 查找所有以 answerEditor{question_id} 开头的 textarea
+        textareas = div_tag.find_all("textarea", attrs={"name": re.compile(f"^answerEditor{question_id}")})
+        if textareas:
+            for ta in textareas:
+                answer_field[ta["name"]] = ""
+        else:
+            answer_field[f"answer{question_id}"] = ""
+    else:
+        answer_field[f"answer{question_id}"] = ""
+
+    answer_field[f"answertype{question_id}"] = q_type_code
+
     return {
         "id": question_id,
         "title": q_title,
         "options": q_options,
         "type": q_type,
-        "answerField": {
-            f"answer{question_id}": "",
-            f"answertype{question_id}": q_type_code,
-        },
+        "answerField": answer_field,
     }
 
 
