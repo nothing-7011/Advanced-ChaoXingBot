@@ -765,10 +765,6 @@ class Chaoxing:
             logger.info("当前为大模型答题模式，正在收集题目信息...")
             QuestionCollector().add_questions(_course['courseId'], questions.get("questions", []))
 
-            if not self.tiku.is_completed(_course['courseId']):
-                logger.info("AI模式: 答案未生成完成，仅收集题目，不提交。")
-                return StudyResult.SUCCESS
-
         _ORIGIN_HTML_CONTENT = final_resp.text  # 用于配合输出网页源码, 帮助修复#391错误
 
         # 搜题
@@ -783,7 +779,8 @@ class Chaoxing:
             answer = ""
             if not res:
                 if self.tiku.name == 'AI大模型答题':
-                    pass
+                    q[f'answerSource{q["id"]}'] = "none"
+                    logger.warning(f"AI模式未找到题目答案(ID: {q['id']})，将留空处理")
                 else:
                     # 随机答题
                     answer = random_answer(q["options"])
