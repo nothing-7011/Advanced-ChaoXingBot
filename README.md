@@ -22,7 +22,7 @@
 ## :rocket: 快速开始
 
 ### 源码运行
-1. `git clone --depth=1 https://github.com/Samueli924/chaoxing` 项目至本地
+1. `git clone --depth=1 https://github.com/nothing-7011/Advanced-ChaoXingBot` 项目至本地
 2. `cd chaoxing`
 3. `pip install -r requirements.txt` 或者 `pip install .` (通过 pyproject.toml 安装依赖)
 4. **推荐**: 复制 `config_template.ini` 为 `config.ini`，并参照下文配置。
