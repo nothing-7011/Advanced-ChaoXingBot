@@ -21,27 +21,13 @@
 
 ## :rocket: 快速开始
 
-### 1. 源码运行
+### 源码运行
 1. `git clone --depth=1 https://github.com/Samueli924/chaoxing` 项目至本地
 2. `cd chaoxing`
 3. `pip install -r requirements.txt` 或者 `pip install .` (通过 pyproject.toml 安装依赖)
 4. **推荐**: 复制 `config_template.ini` 为 `config.ini`，并参照下文配置。
 5. 运行: `python main.py` (会自动读取 `config.ini`)
    - 也可以使用命令行参数: `python main.py -u 手机号 -p 密码 -l 课程ID1,课程ID2`
-
-### 2. 打包文件运行 (Windows)
-1. 从 [Releases](https://github.com/Samueli924/chaoxing/releases) 下载最新 exe 文件。
-2. 将 `config_template.ini` 下载并重命名为 `config.ini`，放在 exe 同级目录并配置。
-3. 双击运行 exe，或在命令行运行: `./chaoxing.exe`
-
-### 3. Docker 运行
-```bash
-# 构建
-docker build -t chaoxing .
-
-# 运行 (挂载配置文件)
-docker run -it -v /你的路径/config.ini:/config/config.ini chaoxing
-```
 
 ---
 
@@ -80,7 +66,7 @@ docker run -it -v /你的路径/config.ini:/config/config.ini chaoxing
 
 ## :sparkles: AI 大模型答题 (Gemini)
 
-本项目新增了基于 Google Gemini 的多模态 AI 答题功能，支持图文识别与智能推理。
+本项目新增了多模态 AI 答题功能，支持图文识别与智能推理。使用google gen-ai sdk处理大模型通信，需要使用/v1beta端点
 旨在于解决学习通题目中间包含莫名其妙的html 图片标签而大模型不能自主识别的问题。
 原项目仅支持“自测试题”栏目下的题目获取，尽管其他小节（比如“教学内容”）的题目也有被收集，但是选项信息完全对不上，目前没有解决这个问题（程序也不会保存或者提交这些题目的答案）。
 
@@ -101,7 +87,7 @@ provider = AI
 submit = true  ; 是否自动提交，可以设false
 
 [parser]
-; 用于解析题目图片的 Gemini API Key (必须支持 Vision，如 gemini-2.0-flash，实际上只需要有gemini-2.5-flash-lite的多模态能力就可以了)
+; 用于解析题目图片的 Gemini API Key (必须支持 Vision，如 gemini-2.5-flash，实际上只需要有gemini-2.5-flash-lite的多模态能力就可以了)
 gemini_api_key = xxxxxxx
 model = gemini-2.0-flash
 
