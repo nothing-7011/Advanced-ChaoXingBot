@@ -441,6 +441,13 @@ def _process_question(div_tag, font_decoder=None) -> Dict[str, Any]:
     title_div = div_tag.find("div", class_="Zy_TItle")
     options_list = div_tag.find("ul").find_all("li") if div_tag.find("ul") else []
     
+    # 提取填空题的空数
+    blank_size = 0
+    if q_type == "completion":
+        tiankong_size_input = div_tag.find("input", attrs={"name": f"tiankongsize{question_id}"})
+        if tiankong_size_input:
+            blank_size = int(tiankong_size_input.attrs.get("value", 0))
+
     # 解析题目和选项
     q_title = _extract_title(title_div, font_decoder)
     q_options = []
@@ -455,6 +462,7 @@ def _process_question(div_tag, font_decoder=None) -> Dict[str, Any]:
         "title": q_title,
         "options": q_options,
         "type": q_type,
+        "blank_size": blank_size,
         "answerField": {
             f"answer{question_id}": "",
             f"answertype{question_id}": q_type_code,

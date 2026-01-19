@@ -823,10 +823,36 @@ class Chaoxing:
                     else:
                         answer = "true" if judgement_res else "false"
                 elif q["type"] == "completion":
+                    # 填空题处理
+                    # 需要注意的是，如果有多个空，res应该是一个列表，或者用\n分隔的字符串
+                    # 这里尝试尽量保留列表结构，或者如果是字符串则尝试分割
+                    answers_list = []
                     if isinstance(res, list):
-                        answer = "".join(res)
+                        answers_list = res
+                        answer = "".join(res) # 兼容旧逻辑
                     elif isinstance(res, str):
                         answer = res
+                        # 尝试分割，有些题库用\n分隔，有些可能没有
+                        # 如果blank_size > 1，尝试分割
+                        blank_size = q.get("blank_size", 0)
+                        if blank_size > 1 and "\n" in res:
+                             answers_list = res.split("\n")
+                        else:
+                             answers_list = [res] # 只有一个空或者无法分割
+
+                    # 填充 answerEditor{id}{i}
+                    # 注意：HTML中下标从1开始
+                    blank_size = q.get("blank_size", 0)
+                    if blank_size > 0:
+                        for i in range(blank_size):
+                             val = ""
+                             if i < len(answers_list):
+                                 val = answers_list[i]
+                             # 如果答案不够，或者无法分割，可能需要更智能的处理，这里先置空或重复使用
+                             # 如果只有一个答案但有多个空，可能意味着这是一个整体的答案？或者题库返回格式不对
+                             # 暂时保持 val 为空如果不匹配
+                             q["answerField"][f'answerEditor{q["id"]}{i+1}'] = val
+
                 else:
                     # 其他类型直接使用答案 （目前仅知有简答题，待补充处理）
                     answer = res
@@ -860,19 +886,33 @@ class Chaoxing:
         # 组建提交表单
         if questions["pyFlag"] == "1":
             for q in questions["questions"]:
+                # 处理可能存在的 extra fields (如 answerEditor)
+                extra_fields = {}
+                for k, v in q["answerField"].items():
+                    if k.startswith("answerEditor"):
+                         if q[f'answerSource{q["id"]}'] == "cover":
+                             extra_fields[k] = v
+                         else:
+                             extra_fields[k] = ""
+
                 questions.update(
                     {
                         f'answer{q["id"]}':
                             q["answerField"][f'answer{q["id"]}'] if q[f'answerSource{q["id"]}'] == "cover" else '',
                         f'answertype{q["id"]}': q["answerField"][f'answertype{q["id"]}'],
+                        **extra_fields
                     }
                 )
         else:
             for q in questions["questions"]:
+                # 处理可能存在的 extra fields (如 answerEditor)
+                extra_fields = {k: v for k, v in q["answerField"].items() if k.startswith("answerEditor")}
+
                 questions.update(
                     {
                         f'answer{q["id"]}': q["answerField"][f'answer{q["id"]}'],
                         f'answertype{q["id"]}': q["answerField"][f'answertype{q["id"]}'],
+                        **extra_fields
                     }
                 )
 
