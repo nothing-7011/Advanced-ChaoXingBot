@@ -53,23 +53,49 @@ class QuestionCollector:
                 except Exception as e:
                     logger.error(f"Failed to load existing questions for course {course_id}: {e}")
 
-            existing_ids = {str(q.get("id")) for q in current_data["questions"] if "id" in q}
+            # Map ID to index in the list for easy update
+            id_to_index = {str(q.get("id")): i for i, q in enumerate(current_data["questions"]) if "id" in q}
 
             added_count = 0
+            updated_count = 0
+
             for q in questions:
                 q_id = str(q.get("id"))
-                if q_id and q_id in existing_ids:
+                if not q_id:
+                    current_data["questions"].append(q)
+                    added_count += 1
                     continue
-                current_data["questions"].append(q)
-                if q_id:
-                    existing_ids.add(q_id)
-                added_count += 1
 
-            if added_count > 0:
+                if q_id in id_to_index:
+                    idx = id_to_index[q_id]
+                    existing_q = current_data["questions"][idx]
+
+                    # Check if content changed (title, options, type)
+                    has_changed = False
+                    if existing_q.get("title") != q.get("title"):
+                        has_changed = True
+                    elif existing_q.get("type") != q.get("type"):
+                        has_changed = True
+                    else:
+                        # Options might be string or list, normalize for comparison?
+                        # Usually they come as same type from source.
+                        if existing_q.get("options") != q.get("options"):
+                            has_changed = True
+
+                    if has_changed:
+                        current_data["questions"][idx] = q
+                        updated_count += 1
+                        logger.debug(f"Updated question {q_id} due to content change.")
+                else:
+                    current_data["questions"].append(q)
+                    id_to_index[q_id] = len(current_data["questions"]) - 1
+                    added_count += 1
+
+            if added_count > 0 or updated_count > 0:
                 try:
                     with open(file_path, "w", encoding="utf-8") as f:
                         json.dump(current_data, f, ensure_ascii=False, indent=2)
-                    logger.info(f"Saved {added_count} new questions for course {course_id}")
+                    logger.info(f"Saved {added_count} new, {updated_count} updated questions for course {course_id}")
                 except Exception as e:
                     logger.error(f"Failed to save questions for course {course_id}: {e}")
 
