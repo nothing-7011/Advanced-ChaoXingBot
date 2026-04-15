@@ -9,6 +9,7 @@ sys.path.append(os.getcwd())
 
 from agents.parser_agent import ImageParserAgent
 
+
 class TestParserCache(unittest.TestCase):
     def setUp(self):
         self.test_parsed_file = "tests/parsed_test.json"
@@ -38,10 +39,10 @@ class TestParserCache(unittest.TestCase):
         mock_image_open.return_value = MagicMock()
 
         # Initialize agent with test parsed file path
-        # We will assume we added the parsed_path argument
         agent = ImageParserAgent(
+            api_type="gemini_v1beta",
             api_key="fake_key",
-            parsed_path=self.test_parsed_file
+            parsed_path=self.test_parsed_file,
         )
 
         # 1. Test loading: Should be empty initially
@@ -53,6 +54,7 @@ class TestParserCache(unittest.TestCase):
 
         # Capture stdout to verify console output
         from io import StringIO
+
         captured_output = StringIO()
         original_stdout = sys.stdout
         sys.stdout = captured_output
@@ -73,7 +75,7 @@ class TestParserCache(unittest.TestCase):
         self.assertEqual(agent.parsed_cache[url], " [Gemini Description] ")
 
         # Verify file saved
-        with open(self.test_parsed_file, 'r') as f:
+        with open(self.test_parsed_file, "r") as f:
             saved_data = json.load(f)
             self.assertEqual(saved_data[url], " [Gemini Description] ")
 
@@ -97,5 +99,6 @@ class TestParserCache(unittest.TestCase):
 
         self.assertEqual(new_text_2, new_text)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

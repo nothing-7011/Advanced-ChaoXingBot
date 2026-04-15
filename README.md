@@ -60,13 +60,18 @@
 *   `TikuLike`: LIKE知识库 (需配置 `tokens`, `likeapi_*` 选项)
 *   `TikuAdapter`: [tikuAdapter](https://github.com/DokiDoki1103/tikuAdapter) 项目 (需配置 `url`)
 *   `SiliconFlow`: 硅基流动 AI (需配置 `siliconflow_key`, `siliconflow_model`)
-*   `AI`: **AI 大模型答题 (Gemini)** (详见下文)
+*   `AI`: **AI 大模型答题 (Gemini / OpenAI Compatible)** (详见下文)
 
 ---
 
-## :sparkles: AI 大模型答题 (Gemini)
+## :sparkles: AI 大模型答题 (Gemini / OpenAI Compatible)
 
-本项目新增了多模态 AI 答题功能，支持图文识别与智能推理。使用google gen-ai sdk处理大模型通信，需要使用/v1beta端点
+本项目新增了多模态 AI 答题功能，支持图文识别与智能推理。
+`[parser]` 和 `[solver]` 都支持两种协议：
+- `gemini_v1beta`: 使用 `google-genai` SDK，对接 Gemini V1beta 兼容端点
+- `openai_compatible`: 使用 `/v1/chat/completions` 风格接口
+
+如果使用 `gemini_v1beta`，需要提供 Gemini V1beta 兼容端点；如果使用 `openai_compatible`，需要提供 OpenAI Compatible 端点。
 旨在于解决学习通题目中间包含莫名其妙的html 图片标签而大模型不能自主识别的问题。
 原项目仅支持“自测试题”栏目下的题目获取，尽管其他小节（比如“教学内容”）的题目也有被收集，但是选项信息完全对不上，目前没有解决这个问题（程序也不会保存或者提交这些题目的答案）。
 
@@ -87,16 +92,20 @@ provider = AI
 submit = true  ; 是否自动提交，可以设false
 
 [parser]
-; 用于解析题目图片的 Gemini API Key (必须支持 Vision，如 gemini-2.5-flash，实际上只需要有gemini-2.5-flash-lite的多模态能力就可以了)
-gemini_api_key = xxxxxxx
+api_type = gemini_v1beta
+api_key = xxxxxxx
 model = gemini-2.0-flash
+endpoint = https://generativelanguage.googleapis.com
 
 [solver]
-; 用于推理答案的 Gemini API Key (这里可以用CLIProxyAPI转接一个纯文本模型，如 deepseek-reasoner，以我的概率论课程习题为例，用gemini-3-pro-preview直接一遍全对了)
-gemini_api_key = xxxxxxx
-model = gemini-2.0-flash
+api_type = openai_compatible
+api_key = xxxxxxx
+model = gpt-5.4
+endpoint = https://your-endpoint.example/v1
 request_interval = 2.0  ; 请求间隔(秒)，避免触发限流
 ```
+
+也可以让两个 Agent 都走同一种协议，只要端点支持对应能力即可。
 
 ### :warning: 使用流程 (重要)
 
@@ -112,7 +121,7 @@ request_interval = 2.0  ; 请求间隔(秒)，避免触发限流
     *   程序再次遍历课程，读取上一步生成的 `answers.json`。
     *   如果答案完整，则自动填入并提交任务点。
 
-> **注意**: 请确保你的网络环境可以连接 Google Gemini API，或在配置中设置反代 `endpoint`。
+> **注意**: `gemini_v1beta` 需要 Gemini V1beta 兼容端点，`openai_compatible` 需要 `/v1/chat/completions` 兼容端点。图片解析是否可用取决于对应端点是否支持视觉输入。
 
 ---
 
